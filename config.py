@@ -4,6 +4,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 class Config:
   SECRET_KEY = os.environ.get('SECRET_KEY') or 'hard to guess string'
   SQLALCHEMY_COMMIT_ON_TEARDOWN = True
+  SSL_DISABLE = False
+  SQLALCHEMY_RECORD_QUERIES = True
   MAIL_SERVER = 'smtp.googlemail.com'
   MAIL_PORT = 587
   MAIL_USE_TLS = True
@@ -15,8 +17,6 @@ class Config:
   FLASKY_POSTS_PER_PAGE = 20
   FLASKY_FOLLOWERS_PER_PAGE = 50
   FLASKY_COMMENTS_PER_PAGE = 20
-
-  SQLALCHEMY_RECORD_QUERIES = True
   FLASKY_SLOW_DB_QUERY_TIME=0.5
 
   @staticmethod
@@ -61,9 +61,30 @@ class ProductionConfig(Config):
     mail_handler.setLevel(logging.ERROR)
     app.logger.addHandler(mail_handler)
 
+class HerokuConfig(ProductionConfig):
+    SSL_DISABLE = bool(os.environ.get('SSL_DISABLE'))
+
+    @classmethod
+    def init_app(cls, app):
+        ProductionConfig.init_app(app)
+
+        # handle proxy server headers
+        from werkzeug.contrib.fixers import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app)
+
+        # log to stderr
+        import logging
+        from logging import StreamHandler
+        file_handler = StreamHandler()
+        file_handler.setLevel(logging.WARNING)
+        app.logger.addHandler(file_handler)
+
+
 config = {
-  'development': DevelopmentConfig,
-  'testing': TestingConfig,
-  'production': ProductionConfig,
-  'default': DevelopmentConfig
+    'development': DevelopmentConfig,
+    'testing': TestingConfig,
+    'production': ProductionConfig,
+    'heroku': HerokuConfig,
+
+    'default': DevelopmentConfig
 }
